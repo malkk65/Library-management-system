@@ -193,14 +193,31 @@ public class MemberLoginPage extends BasePage {
             return;
         }
 
-        if (password.length() < 6) {
-            showMessage("Error", "Password must be at least 6 characters", false);
-            return;
-        }
+        // --- DATABASE LOGIN VERIFICATION ---
+        String sql = "SELECT UserID, Role FROM Users WHERE Email = ?";
+        try (java.sql.Connection conn = com.library.common.DatabaseConnection.getConnection();
+                java.sql.PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, email);
+            java.sql.ResultSet rs = pstmt.executeQuery();
 
-        // --- SUCCESSFUL LOGIN ---
-        showMessage("Success", "Successful login!", true);
-        controller.navigateTo("HomeMember"); // Navigate to Member Home
+            if (rs.next()) {
+                int userId = rs.getInt("UserID");
+                String dbRoleStr = rs.getString("Role");
+                if (dbRoleStr != null && dbRoleStr.equalsIgnoreCase("Member")) {
+                    com.library.common.UserSession.getInstance().login(userId, email,
+                            com.library.common.UserSession.Role.MEMBER);
+                    showMessage("Success", "Successful login!", true);
+                    controller.navigateTo("HomeMember");
+                } else {
+                    showMessage("Error", "Access Denied: You are not a member (Role: " + dbRoleStr + ")", false);
+                }
+            } else {
+                showMessage("Error", "Email not found. Please sign up.", false);
+            }
+        } catch (java.sql.SQLException e) {
+            e.printStackTrace();
+            showMessage("Error", "Database error: " + e.getMessage(), false);
+        }
     }
 
     @Override
